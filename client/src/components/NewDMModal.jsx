@@ -10,7 +10,7 @@ export default function NewDMModal({ isOpen, onClose, onSelectUser }) {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const { onlineUserIds } = useSocket();
+  const { socket, onlineUserIds } = useSocket();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -26,7 +26,22 @@ export default function NewDMModal({ isOpen, onClose, onSelectUser }) {
         console.error('Failed to load users:', err);
         setLoading(false);
       });
-  }, [isOpen]);
+
+    if (!socket) return;
+    const handleUserRegistered = (data) => {
+      if (data?.user) {
+        setUsers((prev) => {
+          if (prev.some((u) => u.id === data.user.id)) return prev;
+          return [...prev, data.user];
+        });
+      }
+    };
+
+    socket.on('user:registered', handleUserRegistered);
+    return () => {
+      socket.off('user:registered', handleUserRegistered);
+    };
+  }, [isOpen, socket]);
 
   if (!isOpen) return null;
 

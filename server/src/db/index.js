@@ -21,8 +21,10 @@ export const pool = new Pool({
 
 let isPostgresAvailable = false;
 
-// Fallback in-memory database store if PostgreSQL is not currently running locally
-const memDb = {
+const dataDir = path.join(__dirname, '../../data');
+const dataFilePath = path.join(dataDir, 'syncwave_db.json');
+
+const DEFAULT_SEED = {
   users: [
     {
       id: 1,
@@ -30,7 +32,7 @@ const memDb = {
       email: 'alice@company.com',
       password_hash: '$2b$10$7MH9eDpwFoS8uDNRiMDox.5zSz4.8n4vjiVhM89gJNbHMtMZWzmmS', // password123
       avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=alice',
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     },
     {
       id: 2,
@@ -38,21 +40,21 @@ const memDb = {
       email: 'bob@company.com',
       password_hash: '$2b$10$7MH9eDpwFoS8uDNRiMDox.5zSz4.8n4vjiVhM89gJNbHMtMZWzmmS', // password123
       avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=bob',
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     },
   ],
   rooms: [
-    { id: 1, name: 'general', description: 'Company-wide general discussions and announcements', is_private: false, created_by: null, created_at: new Date() },
-    { id: 2, name: 'engineering', description: 'Tech discussions, architecture, and code reviews', is_private: false, created_by: null, created_at: new Date() },
-    { id: 3, name: 'random', description: 'Casual banter, memes, and coffee break chats', is_private: false, created_by: null, created_at: new Date() },
+    { id: 1, name: 'general', description: 'Company-wide general discussions and announcements', is_private: false, created_by: null, created_at: new Date().toISOString() },
+    { id: 2, name: 'engineering', description: 'Tech discussions, architecture, and code reviews', is_private: false, created_by: null, created_at: new Date().toISOString() },
+    { id: 3, name: 'random', description: 'Casual banter, memes, and coffee break chats', is_private: false, created_by: null, created_at: new Date().toISOString() },
   ],
   room_members: [
-    { room_id: 1, user_id: 1, joined_at: new Date() },
-    { room_id: 1, user_id: 2, joined_at: new Date() },
-    { room_id: 2, user_id: 1, joined_at: new Date() },
-    { room_id: 2, user_id: 2, joined_at: new Date() },
-    { room_id: 3, user_id: 1, joined_at: new Date() },
-    { room_id: 3, user_id: 2, joined_at: new Date() },
+    { room_id: 1, user_id: 1, joined_at: new Date().toISOString() },
+    { room_id: 1, user_id: 2, joined_at: new Date().toISOString() },
+    { room_id: 2, user_id: 1, joined_at: new Date().toISOString() },
+    { room_id: 2, user_id: 2, joined_at: new Date().toISOString() },
+    { room_id: 3, user_id: 1, joined_at: new Date().toISOString() },
+    { room_id: 3, user_id: 2, joined_at: new Date().toISOString() },
   ],
   messages: [
     {
@@ -60,19 +62,63 @@ const memDb = {
       room_id: 1,
       sender_id: 1,
       content: 'Welcome to the new SyncWave real-time chat platform! 🚀',
-      created_at: new Date(Date.now() - 3600000),
+      created_at: new Date(Date.now() - 3600000).toISOString(),
     },
     {
       id: 2,
       room_id: 1,
       sender_id: 2,
       content: 'Excited to be here! The WebSockets and presence synchronization are super snappy.',
-      created_at: new Date(Date.now() - 1800000),
+      created_at: new Date(Date.now() - 1800000).toISOString(),
     },
   ],
-  nextUserId: 3,
-  nextRoomId: 4,
-  nextMessageId: 3,
+};
+
+const loadMemDb = () => {
+  try {
+    if (fs.existsSync(dataFilePath)) {
+      const raw = fs.readFileSync(dataFilePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed.users && parsed.rooms && parsed.room_members && parsed.messages) {
+        parsed.nextUserId = Math.max(...parsed.users.map((u) => u.id), 0) + 1;
+        parsed.nextRoomId = Math.max(...parsed.rooms.map((r) => r.id), 0) + 1;
+        parsed.nextMessageId = Math.max(...parsed.messages.map((m) => m.id), 0) + 1;
+        console.log(`📦 Loaded database state from disk: ${parsed.users.length} users, ${parsed.rooms.length} rooms, ${parsed.messages.length} messages`);
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Could not read database file, initializing fresh seed:', err.message);
+  }
+
+  const initial = JSON.parse(JSON.stringify(DEFAULT_SEED));
+  initial.nextUserId = 3;
+  initial.nextRoomId = 4;
+  initial.nextMessageId = 3;
+  try {
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(dataFilePath, JSON.stringify(initial, null, 2), 'utf8');
+    console.log('📦 Created fresh persistent database store at server/data/syncwave_db.json');
+  } catch (err) {
+    console.warn('⚠️ Could not initialize database file on disk:', err.message);
+  }
+  return initial;
+};
+
+// Persistent store initialized from disk
+const memDb = loadMemDb();
+
+const saveMemDb = () => {
+  try {
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(dataFilePath, JSON.stringify(memDb, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Failed to persist database state to disk:', err.message);
+  }
 };
 
 pool.on('error', () => {
@@ -120,9 +166,10 @@ export const query = async (text, params = []) => {
       email: params[1],
       password_hash: params[2],
       avatar_url: params[3],
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     };
     memDb.users.push(newUser);
+    saveMemDb();
     return { rows: [newUser], rowCount: 1 };
   }
 
@@ -182,9 +229,10 @@ export const query = async (text, params = []) => {
       description: params[1] || '',
       is_private: !!params[2],
       created_by: params[3] || null,
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     };
     memDb.rooms.push(newRoom);
+    saveMemDb();
     return { rows: [newRoom], rowCount: 1 };
   }
 
@@ -193,7 +241,8 @@ export const query = async (text, params = []) => {
     const rId = Number(params[0]);
     const uId = Number(params[1]);
     if (!memDb.room_members.some((rm) => rm.room_id === rId && rm.user_id === uId)) {
-      memDb.room_members.push({ room_id: rId, user_id: uId, joined_at: new Date() });
+      memDb.room_members.push({ room_id: rId, user_id: uId, joined_at: new Date().toISOString() });
+      saveMemDb();
     }
     return { rows: [], rowCount: 1 };
   }
@@ -229,6 +278,7 @@ export const query = async (text, params = []) => {
     memDb.room_members = memDb.room_members.filter(
       (rm) => !(rm.room_id === rId && rm.user_id === uId)
     );
+    saveMemDb();
     return { rows: [], rowCount: 1 };
   }
 
@@ -281,9 +331,10 @@ export const query = async (text, params = []) => {
       room_id: Number(params[0]),
       sender_id: Number(params[1]),
       content: params[2],
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     };
     memDb.messages.push(newMsg);
+    saveMemDb();
     return { rows: [newMsg], rowCount: 1 };
   }
 

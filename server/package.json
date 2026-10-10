@@ -5,7 +5,7 @@
   "description": "Backend server for real-time team chat application",
   "main": "server.js",
   "scripts": {
-    "dev": "node --watch server.js",
+    "dev": "node --watch --watch-path=src --watch-path=server.js server.js",
     "start": "node server.js"
   },
   "dependencies": {
