@@ -64,14 +64,40 @@ export const register = async (req, res) => {
     const user = result.rows[0];
     const token = generateToken(user);
 
-    // Auto-join default public channels
+    // Auto-join default public channels and notify all connected clients
     try {
       const publicRooms = await query('SELECT id FROM rooms WHERE is_private = FALSE');
+      const io = req.app.get('io');
+
       for (const room of publicRooms.rows) {
         await query(
           'INSERT INTO room_members (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
           [room.id, user.id]
         );
+
+        if (io) {
+          const countRes = await query('SELECT COUNT(*)::INTEGER as count FROM room_members WHERE room_id = $1', [room.id]);
+          const memberCount = countRes.rows[0]?.count || 1;
+
+          io.emit('room:member_joined', {
+            roomId: room.id,
+            userId: user.id,
+            username: user.username,
+            avatar_url: user.avatar_url,
+            memberCount,
+          });
+        }
+      }
+
+      if (io) {
+        io.emit('user:registered', {
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            avatar_url: user.avatar_url,
+          },
+        });
       }
     } catch (e) {
       console.error('Error auto-joining default rooms:', e.message);

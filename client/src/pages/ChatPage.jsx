@@ -62,7 +62,7 @@ export default function ChatPage() {
       });
     };
 
-    const handleMemberJoined = ({ roomId, memberCount }) => {
+    const handleMemberJoined = async ({ roomId, memberCount }) => {
       setRooms((prev) =>
         prev.map((r) => (r.id === roomId ? { ...r, member_count: memberCount } : r))
       );
@@ -72,6 +72,34 @@ export default function ChatPage() {
         }
         return prev;
       });
+
+      // Instantly reload active room members list live
+      if (activeRoomRef.current?.id === roomId) {
+        try {
+          const updated = await api.getRoomMembers(roomId);
+          setRoomMembers(updated || []);
+        } catch (e) {}
+      }
+    };
+
+    const handleUserRegistered = async () => {
+      // Reload members if on a public channel
+      if (activeRoomRef.current && !activeRoomRef.current.is_dm) {
+        try {
+          const updated = await api.getRoomMembers(activeRoomRef.current.id);
+          setRoomMembers(updated || []);
+        } catch (e) {}
+      }
+    };
+
+    const handlePresenceUpdate = async () => {
+      // Sync room members live when someone connects
+      if (activeRoomRef.current) {
+        try {
+          const updated = await api.getRoomMembers(activeRoomRef.current.id);
+          setRoomMembers(updated || []);
+        } catch (e) {}
+      }
     };
 
     const handleMessageReceived = (msg) => {
@@ -94,11 +122,15 @@ export default function ChatPage() {
 
     socket.on('room:created', handleRoomCreated);
     socket.on('room:member_joined', handleMemberJoined);
+    socket.on('user:registered', handleUserRegistered);
+    socket.on('presence:update', handlePresenceUpdate);
     socket.on('message:received', handleMessageReceived);
 
     return () => {
       socket.off('room:created', handleRoomCreated);
       socket.off('room:member_joined', handleMemberJoined);
+      socket.off('user:registered', handleUserRegistered);
+      socket.off('presence:update', handlePresenceUpdate);
       socket.off('message:received', handleMessageReceived);
     };
   }, [socket]);
