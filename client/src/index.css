@@ -1,0 +1,200 @@
+/* client/src/index.css */
+/* Custom Palette Design System: #F6E2E9, #FEFAF3, #B8CFB3, #84A282 */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  /* Custom Color Palette Tokens */
+  --palette-blush: #F6E2E9;
+  --palette-cream: #FEFAF3;
+  --palette-sage-light: #B8CFB3;
+  --palette-sage-dark: #84A282;
+
+  /* Semantic UI Tokens */
+  --bg-primary: #FEFAF3;
+  --bg-secondary: #fbf3ea;
+  --bg-tertiary: #f4e8dd;
+  --bg-card: rgba(254, 250, 243, 0.85);
+  --bg-input: #ffffff;
+  --bg-hover: rgba(132, 162, 130, 0.12);
+
+  --accent-primary: #84A282;
+  --accent-primary-hover: #718f6f;
+  --accent-gradient: linear-gradient(135deg, #84A282 0%, #a4bf9f 50%, #e8c8d3 100%);
+  --accent-blush: #F6E2E9;
+  --accent-sage: #B8CFB3;
+  --accent-emerald: #5a8a58;
+
+  --text-main: #1f2d22;
+  --text-muted: #526656;
+  --text-subtle: #7a8e7e;
+
+  --border-subtle: rgba(132, 162, 130, 0.22);
+  --border-focus: rgba(132, 162, 130, 0.6);
+
+  --shadow-sm: 0 2px 8px rgba(132, 162, 130, 0.08);
+  --shadow-md: 0 8px 24px rgba(132, 162, 130, 0.15);
+  --shadow-glow: 0 0 20px rgba(132, 162, 130, 0.25);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(132, 162, 130, 0.3);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(132, 162, 130, 0.5);
+}
+
+/* Glassmorphic Utilities */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+}
+
+.gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Pulse animation for online indicator */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(132, 162, 130, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(132, 162, 130, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(132, 162, 130, 0);
+  }
+}
+
+.online-dot {
+  width: 10px;
+  height: 10px;
+  background-color: var(--accent-primary);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-ring 2s infinite;
+}
+
+.offline-dot {
+  width: 10px;
+  height: 10px;
+  background-color: var(--text-subtle);
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Buttons */
+button {
+  font-family: var(--font-main);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(132, 162, 130, 0.35);
+}
+.btn-primary:hover {
+  background: var(--accent-primary-hover);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: rgba(184, 207, 179, 0.25);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-secondary:hover {
+  background: rgba(184, 207, 179, 0.4);
+  border-color: var(--accent-primary);
+}
+
+/* Inputs */
+input, textarea, select {
+  font-family: var(--font-main);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(132, 162, 130, 0.25);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-subtle);
+}

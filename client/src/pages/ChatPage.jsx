@@ -1,0 +1,243 @@
+// client/src/pages/ChatPage.jsx
+// Purpose: Primary authenticated chat dashboard orchestrating Sidebar, ChatArea, MembersList, Direct Messages, and Modals.
+
+import { useState, useEffect, useRef } from 'react';
+import Sidebar from '../components/Sidebar';
+import ChatArea from '../components/ChatArea';
+import MembersList from '../components/MembersList';
+import CreateRoomModal from '../components/CreateRoomModal';
+import NewDMModal from '../components/NewDMModal';
+import InviteModal from '../components/InviteModal';
+import { useSocket } from '../context/SocketContext';
+import { api } from '../api';
+
+export default function ChatPage() {
+  const [rooms, setRooms] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [roomMembers, setRoomMembers] = useState([]);
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [isMembersOpen, setIsMembersOpen] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDMModalOpen, setIsDMModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+
+  const activeRoomRef = useRef(null);
+  activeRoomRef.current = activeRoom;
+
+  const { socket } = useSocket();
+
+  // Fetch rooms on mount
+  useEffect(() => {
+    let isMounted = true;
+    api
+      .getRooms()
+      .then((data) => {
+        if (!isMounted) return;
+        setRooms(data);
+        if (data.length > 0) {
+          const defaultRoom = data.find((r) => r.name === 'general') || data[0];
+          setActiveRoom(defaultRoom);
+        }
+        setLoadingRooms(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load rooms:', err);
+        if (isMounted) setLoadingRooms(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Listen for real-time room creation, messages, and membership changes
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleRoomCreated = (newRoom) => {
+      setRooms((prev) => {
+        if (prev.some((r) => r.id === newRoom.id)) return prev;
+        return [...prev, newRoom];
+      });
+    };
+
+    const handleMemberJoined = ({ roomId, memberCount }) => {
+      setRooms((prev) =>
+        prev.map((r) => (r.id === roomId ? { ...r, member_count: memberCount } : r))
+      );
+      setActiveRoom((prev) => {
+        if (prev?.id === roomId) {
+          return { ...prev, member_count: memberCount };
+        }
+        return prev;
+      });
+    };
+
+    const handleMessageReceived = (msg) => {
+      // If we don't have this room yet (e.g. brand new incoming DM from another user), re-fetch rooms
+      setRooms((prev) => {
+        if (!prev.some((r) => r.id === msg.room_id)) {
+          api.getRooms().then((updated) => setRooms(updated));
+        }
+        return prev;
+      });
+
+      // If message is in another room than currently open, increment unread badge
+      if (activeRoomRef.current?.id !== msg.room_id) {
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [msg.room_id]: (prev[msg.room_id] || 0) + 1,
+        }));
+      }
+    };
+
+    socket.on('room:created', handleRoomCreated);
+    socket.on('room:member_joined', handleMemberJoined);
+    socket.on('message:received', handleMessageReceived);
+
+    return () => {
+      socket.off('room:created', handleRoomCreated);
+      socket.off('room:member_joined', handleMemberJoined);
+      socket.off('message:received', handleMessageReceived);
+    };
+  }, [socket]);
+
+  // Fetch members whenever active room changes
+  useEffect(() => {
+    if (!activeRoom) return;
+
+    let isMounted = true;
+    api
+      .getRoomMembers(activeRoom.id)
+      .then((members) => {
+        if (!isMounted) return;
+        setRoomMembers(members || []);
+      })
+      .catch((err) => {
+        console.error('Failed to load members:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeRoom?.id]);
+
+  const handleRoomCreated = (newRoom) => {
+    setRooms((prev) => {
+      if (prev.some((r) => r.id === newRoom.id)) return prev;
+      return [...prev, newRoom];
+    });
+    setActiveRoom(newRoom);
+  };
+
+  const handleSelectRoom = (room) => {
+    setActiveRoom(room);
+    // Clear unread count for opened room
+    setUnreadCounts((prev) => ({
+      ...prev,
+      [room.id]: 0,
+    }));
+  };
+
+  const handleToggleMembers = () => {
+    setIsMembersOpen((prev) => !prev);
+  };
+
+  // Join a channel
+  const handleJoinRoom = async (roomId) => {
+    try {
+      await api.joinRoom(roomId);
+      setRooms((prev) =>
+        prev.map((r) =>
+          r.id === roomId ? { ...r, is_member: true, member_count: (r.member_count || 0) + 1 } : r
+        )
+      );
+      setActiveRoom((prev) =>
+        prev?.id === roomId
+          ? { ...prev, is_member: true, member_count: (prev.member_count || 0) + 1 }
+          : prev
+      );
+      // Reload room members
+      const members = await api.getRoomMembers(roomId);
+      setRoomMembers(members || []);
+    } catch (err) {
+      console.error('Failed to join channel:', err);
+    }
+  };
+
+  // Start Direct Message with target user
+  const handleStartDM = async (targetUserId) => {
+    try {
+      const dmRoom = await api.createDM(targetUserId);
+      setRooms((prev) => {
+        if (prev.some((r) => r.id === dmRoom.id)) return prev;
+        return [...prev, dmRoom];
+      });
+      setActiveRoom(dmRoom);
+    } catch (err) {
+      console.error('Failed to start DM:', err);
+    }
+  };
+
+  return (
+    <div style={dashboardContainerStyle}>
+      <Sidebar
+        rooms={rooms}
+        activeRoom={activeRoom}
+        onSelectRoom={handleSelectRoom}
+        onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        onOpenDMModal={() => setIsDMModalOpen(true)}
+        unreadCounts={unreadCounts}
+      />
+
+      <ChatArea
+        activeRoom={activeRoom}
+        onToggleMembers={handleToggleMembers}
+        isMembersOpen={isMembersOpen}
+        onJoinRoom={handleJoinRoom}
+        onOpenInviteModal={() => setIsInviteModalOpen(true)}
+      />
+
+      <MembersList
+        members={roomMembers}
+        isOpen={isMembersOpen}
+        onClose={() => setIsMembersOpen(false)}
+        onStartDM={handleStartDM}
+      />
+
+      <CreateRoomModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onRoomCreated={handleRoomCreated}
+      />
+
+      <NewDMModal
+        isOpen={isDMModalOpen}
+        onClose={() => setIsDMModalOpen(false)}
+        onSelectUser={handleStartDM}
+      />
+
+      <InviteModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        activeRoom={activeRoom}
+        currentMembers={roomMembers}
+        onUserInvited={async () => {
+          if (activeRoom) {
+            const members = await api.getRoomMembers(activeRoom.id);
+            setRoomMembers(members || []);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+const dashboardContainerStyle = {
+  width: '100vw',
+  height: '100vh',
+  display: 'flex',
+  backgroundColor: 'var(--bg-primary)',
+  overflow: 'hidden',
+};
