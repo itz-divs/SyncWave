@@ -226,8 +226,8 @@ export const query = async (text, params = []) => {
   if (/INSERT INTO users/i.test(sql)) {
     let company_id = 1;
     let username, email, password_hash, avatar_url, role;
-    if (params.length >= 6) {
-      company_id = Number(params[0]);
+    if (/company_id/i.test(sql)) {
+      company_id = Number(params[0]) || 1;
       username = params[1];
       email = params[2];
       password_hash = params[3];
@@ -238,8 +238,8 @@ export const query = async (text, params = []) => {
       email = params[1];
       password_hash = params[2];
       avatar_url = params[3];
-      company_id = params[4] ? Number(params[4]) : 1;
-      role = params[5] || 'member';
+      role = params[4] || 'member';
+      company_id = params[5] ? Number(params[5]) : 1;
     }
     const comp = (memDb.companies || []).find((c) => c.id === company_id);
     const company_name = comp ? comp.name : 'SyncWave Corp';
@@ -402,17 +402,18 @@ export const query = async (text, params = []) => {
   if (/INSERT INTO rooms/i.test(sql)) {
     let company_id = 1;
     let name, description, is_private, created_by;
-    if (params.length >= 5) {
-      company_id = Number(params[0]);
-      name = params[1];
+    if (/company_id/i.test(sql)) {
+      company_id = Number(params[0]) || 1;
+      name = String(params[1]);
       description = params[2] || '';
       is_private = !!params[3];
       created_by = params[4] || null;
     } else {
-      name = params[0];
+      name = String(params[0]);
       description = params[1] || '';
       is_private = !!params[2];
       created_by = params[3] || null;
+      company_id = 1;
     }
     const newRoom = {
       id: memDb.nextRoomId++,
