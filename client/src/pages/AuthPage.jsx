@@ -2,7 +2,7 @@
 // Purpose: Authentication view styled with palette #F6E2E9, #FEFAF3, #B8CFB3, #84A282.
 
 import { useState } from 'react';
-import { MessageSquare, Lock, Mail, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Lock, Mail, User, ArrowRight, ShieldCheck, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthPage() {
@@ -11,6 +11,7 @@ export default function AuthPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [companyName, setCompanyName] = useState('SyncWave Corp');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -21,7 +22,7 @@ export default function AuthPage() {
 
     try {
       if (isRegister) {
-        await register(username.trim(), email.trim(), password);
+        await register(username.trim(), email.trim(), password, null, companyName.trim());
       } else {
         await login(email.trim(), password);
       }
@@ -37,10 +38,12 @@ export default function AuthPage() {
       setEmail('alice@company.com');
       setPassword('password123');
       setUsername('alice');
+      setCompanyName('SyncWave Corp');
     } else {
       setEmail('bob@company.com');
       setPassword('password123');
       setUsername('bob');
+      setCompanyName('SyncWave Corp');
     }
   };
 
@@ -105,20 +108,39 @@ export default function AuthPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} style={formStyle}>
           {isRegister && (
-            <div>
-              <label style={labelStyle}>Username</label>
-              <div style={{ position: 'relative' }}>
-                <User size={16} color="#84A282" style={inputIconStyle} />
-                <input
-                  type="text"
-                  placeholder="e.g. alex_rivera"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  style={{ ...inputWithIconStyle, width: '100%' }}
-                />
+            <>
+              <div>
+                <label style={labelStyle}>Username</label>
+                <div style={{ position: 'relative' }}>
+                  <User size={16} color="#84A282" style={inputIconStyle} />
+                  <input
+                    type="text"
+                    placeholder="e.g. alex_rivera"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    style={{ ...inputWithIconStyle, width: '100%' }}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label style={labelStyle}>Company / Workspace</label>
+                <div style={{ position: 'relative' }}>
+                  <Building2 size={16} color="#84A282" style={inputIconStyle} />
+                  <input
+                    type="text"
+                    placeholder="e.g. SyncWave Corp, Acme, Stark Tech"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    style={{ ...inputWithIconStyle, width: '100%' }}
+                  />
+                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  Colleagues with this company name connect to the same workspace.
+                </span>
+              </div>
+            </>
           )}
 
           <div>

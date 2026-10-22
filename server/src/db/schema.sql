@@ -1,20 +1,30 @@
 -- server/src/db/schema.sql
 -- Production Schema for Team Chat Application
 
--- 1. Users Table
-CREATE TABLE IF NOT EXISTS users (
+-- 1. Companies Table
+CREATE TABLE IF NOT EXISTS companies (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    avatar_url VARCHAR(255),
+    name VARCHAR(100) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Chat Rooms Table
+-- 2. Users Table
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    avatar_url VARCHAR(255),
+    role VARCHAR(20) DEFAULT 'member', -- 'admin' or 'member'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Chat Rooms Table
 CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
     description TEXT,
     is_private BOOLEAN DEFAULT FALSE,
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,

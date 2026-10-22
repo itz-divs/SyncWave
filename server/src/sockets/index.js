@@ -62,6 +62,7 @@ export const setupSockets = (httpServer) => {
     
     // Join personal user channel for direct alerts/DMs
     socket.join(`user:${user.id}`);
+    socket.join(`company:${user.company_id || 1}`);
 
     // Auto-join all rooms user is a member of so they always receive incoming messages
     try {

@@ -16,9 +16,16 @@ export const requireAuth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // { id, username, email }
+    req.user = decoded; // { id, username, email, company_id, role }
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired authentication token' });
   }
+};
+
+export const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden: Admin access required' });
+  }
+  next();
 };

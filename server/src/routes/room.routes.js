@@ -11,6 +11,7 @@ import {
   getOrCreateDM,
   getUsersDirectory,
   inviteToRoom,
+  deleteRoom,
   createRoomSchema,
   createDMSchema,
 } from '../controllers/room.controller.js';
@@ -29,6 +30,7 @@ router.use(requireAuth);
 
 router.get('/', getRooms);
 router.post('/', validateBody(createRoomSchema), createRoom);
+router.delete('/:id', deleteRoom);
 router.post('/dm', validateBody(createDMSchema), getOrCreateDM);
 router.get('/users/directory', getUsersDirectory);
 router.post('/:id/join', joinRoom);

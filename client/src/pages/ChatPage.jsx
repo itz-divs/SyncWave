@@ -1,6 +1,3 @@
-// client/src/pages/ChatPage.jsx
-// Purpose: Primary authenticated chat dashboard orchestrating Sidebar, ChatArea, MembersList, Direct Messages, and Modals.
-
 import { useState, useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import ChatArea from '../components/ChatArea';
@@ -8,10 +5,13 @@ import MembersList from '../components/MembersList';
 import CreateRoomModal from '../components/CreateRoomModal';
 import NewDMModal from '../components/NewDMModal';
 import InviteModal from '../components/InviteModal';
+import AdminModal from '../components/AdminModal';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 
 export default function ChatPage() {
+  const { user, updateUser, logout } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [activeRoom, setActiveRoom] = useState(null);
   const [roomMembers, setRoomMembers] = useState([]);
@@ -20,6 +20,7 @@ export default function ChatPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDMModalOpen, setIsDMModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(true);
 
   const activeRoomRef = useRef(null);
@@ -120,11 +121,42 @@ export default function ChatPage() {
       }
     };
 
+    const handleRoomDeleted = ({ roomId }) => {
+      setRooms((prev) => {
+        const remaining = prev.filter((r) => r.id !== roomId);
+        if (activeRoomRef.current?.id === roomId) {
+          setActiveRoom(remaining.length > 0 ? remaining[0] : null);
+        }
+        return remaining;
+      });
+    };
+
+    const handleRoleUpdated = ({ userId, newRole }) => {
+      if (user?.id === userId) {
+        updateUser({ role: newRole });
+      }
+      setRoomMembers((prev) =>
+        prev.map((m) => (m.id === userId ? { ...m, role: newRole } : m))
+      );
+    };
+
+    const handleUserRemoved = ({ userId, username }) => {
+      if (user?.id === userId) {
+        alert('You have been removed from this company workspace by an administrator.');
+        logout();
+        return;
+      }
+      setRoomMembers((prev) => prev.filter((m) => m.id !== userId));
+    };
+
     socket.on('room:created', handleRoomCreated);
     socket.on('room:member_joined', handleMemberJoined);
     socket.on('user:registered', handleUserRegistered);
     socket.on('presence:update', handlePresenceUpdate);
     socket.on('message:received', handleMessageReceived);
+    socket.on('room:deleted', handleRoomDeleted);
+    socket.on('user:role_updated', handleRoleUpdated);
+    socket.on('user:removed', handleUserRemoved);
 
     return () => {
       socket.off('room:created', handleRoomCreated);
@@ -132,8 +164,11 @@ export default function ChatPage() {
       socket.off('user:registered', handleUserRegistered);
       socket.off('presence:update', handlePresenceUpdate);
       socket.off('message:received', handleMessageReceived);
+      socket.off('room:deleted', handleRoomDeleted);
+      socket.off('user:role_updated', handleRoleUpdated);
+      socket.off('user:removed', handleUserRemoved);
     };
-  }, [socket]);
+  }, [socket, user?.id]);
 
   // Fetch members whenever active room changes
   useEffect(() => {
@@ -220,6 +255,7 @@ export default function ChatPage() {
         onSelectRoom={handleSelectRoom}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
         onOpenDMModal={() => setIsDMModalOpen(true)}
+        onOpenAdminModal={() => setIsAdminModalOpen(true)}
         unreadCounts={unreadCounts}
       />
 
@@ -259,6 +295,21 @@ export default function ChatPage() {
           if (activeRoom) {
             const members = await api.getRoomMembers(activeRoom.id);
             setRoomMembers(members || []);
+          }
+        }}
+      />
+
+      <AdminModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        onChannelDeleted={(deletedId) => {
+          setRooms((prev) => prev.filter((r) => r.id !== deletedId));
+          if (activeRoom?.id === deletedId) {
+            setRooms((prev) => {
+              const remaining = prev.filter((r) => r.id !== deletedId);
+              setActiveRoom(remaining.length > 0 ? remaining[0] : null);
+              return remaining;
+            });
           }
         }}
       />

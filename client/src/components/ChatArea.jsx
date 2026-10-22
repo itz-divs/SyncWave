@@ -11,6 +11,7 @@ import {
   Sparkles,
   Clock,
   UserPlus,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -262,6 +263,29 @@ export default function ChatArea({
             >
               <UserPlus size={15} color="#84A282" />
               <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Invite</span>
+            </button>
+          )}
+
+          {!isDM && activeRoom.name !== 'general' && (user?.role === 'admin' || activeRoom.created_by === user?.id) && (
+            <button
+              onClick={async () => {
+                if (window.confirm(`Delete channel #${activeRoom.name}? This will permanently remove all messages.`)) {
+                  try {
+                    await api.deleteRoom(activeRoom.id);
+                  } catch (e) {
+                    alert(e.message || 'Failed to delete room');
+                  }
+                }
+              }}
+              style={{
+                ...memberToggleBtnStyle,
+                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                color: '#dc2626',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+              }}
+              title="Delete this channel"
+            >
+              <Trash2 size={15} />
             </button>
           )}
 

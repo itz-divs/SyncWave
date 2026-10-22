@@ -41,12 +41,16 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  const register = async (username, email, password, avatarUrl) => {
-    const data = await api.register({ username, email, password, avatarUrl });
+  const register = async (username, email, password, avatarUrl, companyName) => {
+    const data = await api.register({ username, email, password, avatarUrl, companyName });
     localStorage.setItem('chat_token', data.token);
     setToken(data.token);
     setUser(data.user);
     return data.user;
+  };
+
+  const updateUser = (updatedFields) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
   };
 
   const logout = () => {
@@ -64,6 +68,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         register,
+        updateUser,
         logout,
       }}
     >

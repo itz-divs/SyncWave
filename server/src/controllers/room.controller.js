@@ -87,6 +87,7 @@ export const getRooms = async (req, res) => {
 export const createRoom = async (req, res) => {
   try {
     const userId = req.user.id;
+    const companyId = req.user.company_id || 1;
     const { name, description, isPrivate } = req.body;
 
     const formattedName = name.trim().toLowerCase().replace(/\s+/g, '-');
@@ -95,16 +96,16 @@ export const createRoom = async (req, res) => {
       return res.status(400).json({ error: 'Room name cannot start with dm:' });
     }
 
-    const existing = await query('SELECT id FROM rooms WHERE name = $1', [formattedName]);
+    const existing = await query('SELECT id FROM rooms WHERE company_id = $1 AND name = $2', [companyId, formattedName]);
     if (existing.rowCount > 0) {
-      return res.status(409).json({ error: 'A room with this name already exists' });
+      return res.status(409).json({ error: 'A room with this name already exists in your workspace' });
     }
 
     const roomResult = await query(
-      `INSERT INTO rooms (name, description, is_private, created_by)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, description, is_private, created_by, created_at`,
-      [formattedName, description, isPrivate || false, userId]
+      `INSERT INTO rooms (company_id, name, description, is_private, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, company_id, name, description, is_private, created_by, created_at`,
+      [companyId, formattedName, description, isPrivate || false, userId]
     );
 
     const newRoom = roomResult.rows[0];
@@ -123,7 +124,7 @@ export const createRoom = async (req, res) => {
       display_name: `#${newRoom.name}`,
     };
 
-    // Broadcast new channel to all connected sockets if public
+    // Broadcast new channel to all connected sockets in company if public
     const io = req.app.get('io');
     if (io && !newRoom.is_private) {
       io.emit('room:created', {
@@ -151,12 +152,18 @@ export const getOrCreateDM = async (req, res) => {
       return res.status(400).json({ error: 'Cannot start a direct message with yourself' });
     }
 
-    // Verify target user exists
-    const targetUserRes = await query('SELECT id, username, avatar_url FROM users WHERE id = $1', [targetUserId]);
+    // Verify target user exists and belongs to same workspace
+    const targetUserRes = await query('SELECT id, company_id, username, avatar_url FROM users WHERE id = $1', [targetUserId]);
     if (targetUserRes.rowCount === 0) {
       return res.status(404).json({ error: 'Target user not found' });
     }
     const targetUser = targetUserRes.rows[0];
+
+    const userCompId = req.user.company_id || 1;
+    const targetCompId = targetUser.company_id || 1;
+    if (userCompId !== targetCompId) {
+      return res.status(403).json({ error: 'Cannot direct message users outside your company workspace' });
+    }
 
     // Deterministic room name for pair
     const minId = Math.min(userId, targetUserId);
@@ -172,12 +179,12 @@ export const getOrCreateDM = async (req, res) => {
       roomRecord = existingRoom.rows[0];
       roomId = roomRecord.id;
     } else {
-      // Create new private DM room
+      // Create new private DM room in company
       const insertResult = await query(
-        `INSERT INTO rooms (name, description, is_private, created_by)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, name, description, is_private, created_by, created_at`,
-        [dmRoomName, `Direct Message between user ${userId} and ${targetUserId}`, true, userId]
+        `INSERT INTO rooms (company_id, name, description, is_private, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, company_id, name, description, is_private, created_by, created_at`,
+        [userCompId, dmRoomName, `Direct Message between user ${userId} and ${targetUserId}`, true, userId]
       );
       roomRecord = insertResult.rows[0];
       roomId = roomRecord.id;
@@ -425,15 +432,57 @@ export const getRoomMembers = async (req, res) => {
 };
 
 /**
- * Get all users for starting DMs
+ * Get all users in the same company for starting DMs and discovering colleagues
  */
 export const getUsersDirectory = async (req, res) => {
   try {
     const userId = req.user.id;
-    const result = await query('SELECT id, username, email, avatar_url, created_at FROM users WHERE id != $1', [userId]);
+    const companyId = req.user.company_id || 1;
+    const result = await query(
+      'SELECT id, username, email, avatar_url, role, company_id, created_at FROM users WHERE company_id = $1 AND id != $2',
+      [companyId, userId]
+    );
     return res.status(200).json({ users: result.rows });
   } catch (error) {
     console.error('getUsersDirectory error:', error);
     return res.status(500).json({ error: 'Failed to fetch users directory' });
+  }
+};
+
+/**
+ * Delete a room (channel) - Allowed for Company Admins or Channel Creator
+ */
+export const deleteRoom = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const roomId = parseInt(req.params.id, 10);
+
+    if (isNaN(roomId)) {
+      return res.status(400).json({ error: 'Invalid room ID' });
+    }
+
+    const roomRes = await query('SELECT * FROM rooms WHERE id = $1', [roomId]);
+    if (roomRes.rowCount === 0) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    const room = roomRes.rows[0];
+
+    // Only workspace admins or the channel creator can delete
+    if (userRole !== 'admin' && room.created_by !== userId) {
+      return res.status(403).json({ error: 'Forbidden: Only workspace admins or channel creators can delete channels' });
+    }
+
+    await query('DELETE FROM rooms WHERE id = $1', [roomId]);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('room:deleted', { roomId });
+    }
+
+    return res.status(200).json({ message: 'Channel deleted successfully', roomId });
+  } catch (error) {
+    console.error('deleteRoom error:', error);
+    return res.status(500).json({ error: 'Failed to delete channel' });
   }
 };

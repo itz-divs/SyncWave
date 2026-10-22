@@ -37,8 +37,25 @@ export default function MembersList({ members, isOpen, onClose, onStartDM }) {
           />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {member.username} {isMe && '(You)'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {member.username} {isMe && '(You)'}
+            </span>
+            {member.role === 'admin' && (
+              <span
+                style={{
+                  fontSize: '0.58rem',
+                  fontWeight: 800,
+                  backgroundColor: 'rgba(132, 162, 130, 0.25)',
+                  color: '#375338',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                ADMIN
+              </span>
+            )}
           </div>
           <div style={{ fontSize: '0.7rem', color: isOnline ? '#84A282' : 'var(--text-subtle)', fontWeight: isOnline ? 600 : 400 }}>
             {isOnline ? 'Active' : 'Offline'}

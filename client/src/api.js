@@ -129,6 +129,16 @@ export const api = {
     return result;
   },
 
+  async deleteRoom(roomId) {
+    const res = await fetch(`${API_BASE_URL}/api/rooms/${roomId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to delete room');
+    return result;
+  },
+
   // Messages
   async getRoomMessages(roomId, beforeId = null) {
     const url = new URL(`${API_BASE_URL}/api/rooms/${roomId}/messages`);
@@ -153,5 +163,57 @@ export const api = {
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Failed to send message');
     return result.message;
+  },
+
+  // Workspace Administration
+  async getAdminOverview() {
+    const res = await fetch(`${API_BASE_URL}/api/admin/overview`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to fetch admin overview');
+    return result;
+  },
+
+  async getAdminMembers() {
+    const res = await fetch(`${API_BASE_URL}/api/admin/members`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to fetch members');
+    return result.members;
+  },
+
+  async updateMemberRole(userId, role) {
+    const res = await fetch(`${API_BASE_URL}/api/admin/members/${userId}/role`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ role }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to update member role');
+    return result;
+  },
+
+  async removeMember(userId) {
+    const res = await fetch(`${API_BASE_URL}/api/admin/members/${userId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to remove member');
+    return result;
+  },
+
+  async getAdminRooms() {
+    const res = await fetch(`${API_BASE_URL}/api/admin/rooms`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to fetch workspace rooms');
+    return result.rooms;
   },
 };

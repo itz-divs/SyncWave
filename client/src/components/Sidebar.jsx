@@ -12,6 +12,8 @@ import {
   Users,
   Sparkles,
   MessageCircle,
+  ShieldCheck,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -22,6 +24,7 @@ export default function Sidebar({
   onSelectRoom,
   onOpenCreateModal,
   onOpenDMModal,
+  onOpenAdminModal,
   unreadCounts,
 }) {
   const { user, logout } = useAuth();
@@ -47,12 +50,17 @@ export default function Sidebar({
           <div style={logoIconStyle}>
             <MessageSquare size={20} color="#FEFAF3" />
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h1 style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span className="gradient-text">SyncWave</span>
-              <span style={badgeStyle}>PRO</span>
+              <span style={badgeStyle}>{user?.role === 'admin' ? 'ADMIN' : 'PRO'}</span>
             </h1>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Real-Time Team Platform</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <Building2 size={11} color="#84A282" />
+              <span style={{ fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.company_name || 'SyncWave Corp'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -78,10 +86,24 @@ export default function Sidebar({
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {user?.username}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.username}
+            </span>
+            <span
+              style={{
+                fontSize: '0.6rem',
+                fontWeight: 800,
+                padding: '1px 5px',
+                borderRadius: '4px',
+                backgroundColor: user?.role === 'admin' ? 'rgba(132, 162, 130, 0.3)' : 'rgba(184, 207, 179, 0.3)',
+                color: user?.role === 'admin' ? '#2e4530' : 'var(--text-muted)',
+              }}
+            >
+              {user?.role === 'admin' ? 'ADMIN' : 'MEMBER'}
+            </span>
           </div>
-          <div style={{ fontSize: '0.75rem', color: connected ? '#84A282' : '#d97706', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.72rem', color: connected ? '#84A282' : '#d97706', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
             {connected ? 'Active Now' : 'Connecting...'}
           </div>
         </div>
@@ -93,6 +115,22 @@ export default function Sidebar({
           <LogOut size={16} />
         </button>
       </div>
+
+      {/* Admin Console Action Button for Workspace Admins */}
+      {user?.role === 'admin' && (
+        <div style={{ padding: '0 16px 10px 16px' }}>
+          <button
+            onClick={onOpenAdminModal}
+            style={adminConsoleBtnStyle}
+            title="Open Workspace Administration Console"
+          >
+            <ShieldCheck size={16} color="#84A282" />
+            <span style={{ fontWeight: 700, fontSize: '0.78rem', color: '#2e4530' }}>
+              Admin Console
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Search Input */}
       <div style={{ padding: '0 16px 10px 16px' }}>
@@ -417,4 +455,19 @@ const footerStyle = {
   padding: '12px 16px',
   borderTop: '1px solid rgba(184, 207, 179, 0.4)',
   backgroundColor: 'rgba(254, 250, 243, 0.5)',
+};
+
+const adminConsoleBtnStyle = {
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  padding: '8px 12px',
+  borderRadius: '10px',
+  backgroundColor: 'rgba(184, 207, 179, 0.45)',
+  border: '1px solid rgba(132, 162, 130, 0.6)',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
+  boxShadow: '0 2px 6px rgba(132, 162, 130, 0.15)',
 };
