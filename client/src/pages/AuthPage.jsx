@@ -22,7 +22,7 @@ export default function AuthPage() {
 
     try {
       if (isRegister) {
-        await register(username.trim(), email.trim(), password, null, companyName.trim());
+        await register(username.trim(), email.trim(), password, '', companyName.trim());
       } else {
         await login(email.trim(), password);
       }

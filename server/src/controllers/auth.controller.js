@@ -13,8 +13,8 @@ export const registerSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters').max(50),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  avatarUrl: z.string().url().optional().or(z.literal('')),
-  companyName: z.string().min(2, 'Company name must be at least 2 characters').max(100).optional().or(z.literal('')),
+  avatarUrl: z.string().url('Invalid avatar URL').optional().nullable().or(z.literal('')).or(z.null()),
+  companyName: z.string().max(100).optional().nullable(),
 });
 
 export const loginSchema = z.object({

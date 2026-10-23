@@ -42,7 +42,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (username, email, password, avatarUrl, companyName) => {
-    const data = await api.register({ username, email, password, avatarUrl, companyName });
+    const payload = { username, email, password };
+    if (avatarUrl) payload.avatarUrl = avatarUrl;
+    if (companyName) payload.companyName = companyName;
+    const data = await api.register(payload);
     localStorage.setItem('chat_token', data.token);
     setToken(data.token);
     setUser(data.user);

@@ -20,7 +20,7 @@ export const api = {
       body: JSON.stringify(data),
     });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Registration failed');
+    if (!res.ok) throw new Error(result.error || result.details?.[0]?.message || 'Registration failed');
     return result;
   },
 
@@ -31,7 +31,7 @@ export const api = {
       body: JSON.stringify(data),
     });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Login failed');
+    if (!res.ok) throw new Error(result.error || result.details?.[0]?.message || 'Login failed');
     return result;
   },
 

@@ -6,15 +6,17 @@ export const validateBody = (schema) => (req, res, next) => {
     req.body = schema.parse(req.body);
     next();
   } catch (error) {
-    if (error.errors) {
+    const issues = error.issues || error.errors;
+    if (issues && issues.length > 0) {
+      const firstMsg = issues[0]?.message || 'Validation failed';
       return res.status(400).json({
-        error: 'Validation failed',
-        details: error.errors.map((e) => ({
-          field: e.path.join('.'),
+        error: firstMsg,
+        details: issues.map((e) => ({
+          field: (e.path || []).join('.'),
           message: e.message,
         })),
       });
     }
-    return res.status(400).json({ error: 'Invalid request data' });
+    return res.status(400).json({ error: error.message || 'Invalid request data' });
   }
 };
