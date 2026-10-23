@@ -38,10 +38,17 @@ export default function NewDMModal({ isOpen, onClose, onSelectUser }) {
     };
 
     socket.on('user:registered', handleUserRegistered);
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       socket.off('user:registered', handleUserRegistered);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, socket]);
+  }, [isOpen, socket, onClose]);
 
   if (!isOpen) return null;
 
@@ -51,7 +58,12 @@ export default function NewDMModal({ isOpen, onClose, onSelectUser }) {
   );
 
   return (
-    <div style={modalOverlayStyle}>
+    <div
+      style={modalOverlayStyle}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div style={modalContentStyle} className="glass-panel">
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

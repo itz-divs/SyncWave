@@ -14,6 +14,7 @@ import {
   MessageCircle,
   ShieldCheck,
   Building2,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -134,15 +135,38 @@ export default function Sidebar({
 
       {/* Search Input */}
       <div style={{ padding: '0 16px 10px 16px' }}>
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={14} color="#84A282" style={searchIconStyle} />
           <input
             type="text"
             placeholder="Search channels or DMs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setSearchTerm('');
+            }}
             style={searchInputStyle}
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2px',
+                cursor: 'pointer',
+              }}
+              title="Clear search"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 

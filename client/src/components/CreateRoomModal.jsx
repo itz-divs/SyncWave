@@ -1,7 +1,7 @@
 // client/src/components/CreateRoomModal.jsx
 // Purpose: Modal dialog styled with palette #F6E2E9, #FEFAF3, #B8CFB3, #84A282.
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Hash, Lock, Plus } from 'lucide-react';
 import { api } from '../api';
 
@@ -11,6 +11,18 @@ export default function CreateRoomModal({ isOpen, onClose, onRoomCreated }) {
   const [isPrivate, setIsPrivate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const nameInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -40,7 +52,12 @@ export default function CreateRoomModal({ isOpen, onClose, onRoomCreated }) {
   };
 
   return (
-    <div style={modalOverlayStyle}>
+    <div
+      style={modalOverlayStyle}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div style={modalContentStyle} className="glass-panel">
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -64,6 +81,7 @@ export default function CreateRoomModal({ isOpen, onClose, onRoomCreated }) {
                 <Hash size={16} color="#84A282" />
               </div>
               <input
+                ref={nameInputRef}
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}

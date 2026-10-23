@@ -1,5 +1,7 @@
 // client/src/components/ChatArea.jsx
-// Purpose: Core chat interface styled with palette #F6E2E9, #FEFAF3, #B8CFB3, #84A282.
+// Purpose: Core real-time chat interface styled with palette #F6E2E9, #FEFAF3, #B8CFB3, #84A282.
+// Includes multiline auto-resizing composer (Enter to send, Shift+Enter for new line),
+// date dividers, copy message text, floating scroll-to-bottom indicator, and URL link auto-formatting.
 
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -12,6 +14,9 @@ import {
   Clock,
   UserPlus,
   Trash2,
+  ChevronDown,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -34,13 +39,18 @@ export default function ChatArea({
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [newMessagesBelow, setNewMessagesBelow] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+  const emojiButtonRef = useRef(null);
 
   // Quick emojis
-  const quickEmojis = ['👍', '🚀', '🔥', '❤️', '🎉', '😄', '💯', '✨'];
+  const quickEmojis = ['👍', '🚀', '🔥', '❤️', '🎉', '😄', '💯', '✨', '👋', '👀'];
 
   // Load room messages, join socket room, and auto-focus cursor
   useEffect(() => {
@@ -54,6 +64,8 @@ export default function ChatArea({
     let isMounted = true;
     setLoading(true);
     setMessages([]);
+    setIsScrolledUp(false);
+    setNewMessagesBelow(false);
 
     // Fetch initial message history
     api
@@ -89,6 +101,16 @@ export default function ChatArea({
           if (prev.some((m) => m.id === newMessage.id)) return prev;
           return [...prev, newMessage];
         });
+
+        // Check if user is scrolled up
+        if (messagesContainerRef.current) {
+          const container = messagesContainerRef.current;
+          const isFarFromBottom =
+            container.scrollHeight - container.scrollTop - container.clientHeight > 140;
+          if (isFarFromBottom) {
+            setNewMessagesBelow(true);
+          }
+        }
       }
     };
 
@@ -99,17 +121,53 @@ export default function ChatArea({
     };
   }, [socket, activeRoom?.id]);
 
-  // Auto-scroll to bottom on new message
+  // Auto-scroll to bottom on new message if user is near bottom
   useEffect(() => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
       const isNearBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        container.scrollHeight - container.scrollTop - container.clientHeight < 160;
       if (isNearBottom || messages.length <= 50) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
     }
   }, [messages]);
+
+  // Click outside to close emoji picker
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        showEmojiPicker &&
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(e.target) &&
+        emojiButtonRef.current &&
+        !emojiButtonRef.current.contains(e.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
+  // Track scroll position for floating Jump to bottom button
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const container = messagesContainerRef.current;
+    const isFarFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight > 140;
+    setIsScrolledUp(isFarFromBottom);
+    if (!isFarFromBottom) {
+      setNewMessagesBelow(false);
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setNewMessagesBelow(false);
+    setIsScrolledUp(false);
+    inputRef.current?.focus();
+  };
 
   // Load older messages (Pagination via Cursor)
   const handleLoadOlder = async () => {
@@ -137,11 +195,20 @@ export default function ChatArea({
     }
   };
 
+  // Auto-resize textarea height
+  const adjustTextareaHeight = (element) => {
+    if (!element) return;
+    element.style.height = 'auto';
+    const nextHeight = Math.min(element.scrollHeight, 140);
+    element.style.height = `${Math.max(nextHeight, 38)}px`;
+  };
+
   const handleInputChange = (e) => {
     setInputText(e.target.value);
     if (activeRoom) {
       startTyping(activeRoom.id);
     }
+    adjustTextareaHeight(e.target);
   };
 
   const handleSendMessage = (e) => {
@@ -152,6 +219,11 @@ export default function ChatArea({
     setInputText('');
     stopTyping(activeRoom.id);
     setShowEmojiPicker(false);
+
+    if (inputRef.current) {
+      inputRef.current.style.height = '38px';
+      inputRef.current.focus();
+    }
 
     if (socket && socket.connected) {
       socket.emit('message:send', {
@@ -166,20 +238,124 @@ export default function ChatArea({
   };
 
   const handleKeyDown = (e) => {
+    // 1. Enter without Shift -> Send Message
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
+    // 2. Ctrl + Enter or Cmd + Enter -> Send Message
+    else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+    // 3. Shift + Enter -> Native new line behavior + auto-expand height
+    else if (e.key === 'Enter' && e.shiftKey) {
+      setTimeout(() => {
+        adjustTextareaHeight(inputRef.current);
+      }, 0);
+    }
+    // 4. Escape -> Close emoji picker
+    else if (e.key === 'Escape') {
+      if (showEmojiPicker) {
+        e.preventDefault();
+        setShowEmojiPicker(false);
+      }
+    }
   };
 
   const addEmoji = (emoji) => {
-    setInputText((prev) => prev + emoji);
+    const textarea = inputRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart ?? inputText.length;
+      const end = textarea.selectionEnd ?? inputText.length;
+      const updated = inputText.substring(0, start) + emoji + inputText.substring(end);
+      setInputText(updated);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+        adjustTextareaHeight(textarea);
+      }, 0);
+    } else {
+      setInputText((prev) => prev + emoji);
+    }
+  };
+
+  const handleCopyMessage = (msgId, text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(msgId);
+    setTimeout(() => {
+      setCopiedId(null);
+    }, 2000);
   };
 
   const formatTime = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDateLabel = (isoDate) => {
+    if (!isoDate) return '';
+    const date = new Date(isoDate);
+    const now = new Date();
+
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    if (isToday) return 'Today';
+    if (isYesterday) return 'Yesterday';
+
+    return date.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+  };
+
+  const getDateKey = (isoDate) => {
+    if (!isoDate) return '';
+    const d = new Date(isoDate);
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  };
+
+  // Auto-detect and render clickable URLs
+  const renderMessageContent = (content, isMe) => {
+    if (!content) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+
+    return parts.map((part, i) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: isMe ? '#ffffff' : '#3d613b',
+              textDecoration: 'underline',
+              fontWeight: 600,
+              wordBreak: 'break-all',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   const currentTypingUsers = (typingState[activeRoom?.id] || []).filter(
@@ -330,9 +506,10 @@ export default function ChatArea({
       {/* Messages Feed */}
       <div
         ref={messagesContainerRef}
+        onScroll={handleScroll}
         style={messagesFeedStyle}
         onClick={(e) => {
-          if (e.target.tagName !== 'BUTTON' && !window.getSelection()?.toString()) {
+          if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && !window.getSelection()?.toString()) {
             inputRef.current?.focus();
           }
         }}
@@ -370,49 +547,74 @@ export default function ChatArea({
         ) : (
           messages.map((msg, index) => {
             const isMe = msg.sender_id === user?.id || msg.username === user?.username;
+            const prevDateKey = index > 0 ? getDateKey(messages[index - 1].created_at) : null;
+            const currentDateKey = getDateKey(msg.created_at);
+            const showDateSeparator = prevDateKey !== currentDateKey;
+
             return (
-              <div
-                key={msg.id || index}
-                style={{
-                  ...messageRowStyle,
-                  flexDirection: isMe ? 'row-reverse' : 'row',
-                }}
-              >
-                <img
-                  src={
-                    msg.avatar_url ||
-                    `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.username || 'User'}`
-                  }
-                  alt={msg.username}
-                  style={messageAvatarStyle}
-                />
+              <div key={msg.id || index}>
+                {/* Date Divider Badge */}
+                {showDateSeparator && (
+                  <div style={dateDividerWrapperStyle}>
+                    <div style={dateDividerLineStyle} />
+                    <span style={dateDividerBadgeStyle}>{formatDateLabel(msg.created_at)}</span>
+                    <div style={dateDividerLineStyle} />
+                  </div>
+                )}
+
                 <div
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: isMe ? 'flex-end' : 'flex-start',
-                    maxWidth: '70%',
+                    ...messageRowStyle,
+                    flexDirection: isMe ? 'row-reverse' : 'row',
                   }}
                 >
-                  <div style={messageMetaStyle}>
-                    <span style={{ fontWeight: 700, fontSize: '0.82rem', color: isMe ? '#84A282' : 'var(--text-main)' }}>
-                      {isMe ? 'You' : msg.username}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
-                      {formatTime(msg.created_at)}
-                    </span>
-                  </div>
+                  <img
+                    src={
+                      msg.avatar_url ||
+                      `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.username || 'User'}`
+                    }
+                    alt={msg.username}
+                    style={messageAvatarStyle}
+                  />
                   <div
                     style={{
-                      ...messageBubbleStyle,
-                      backgroundColor: isMe ? '#84A282' : '#F6E2E9',
-                      color: isMe ? '#FEFAF3' : '#1f2d22',
-                      borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                      border: isMe ? 'none' : '1px solid rgba(184, 207, 179, 0.5)',
-                      boxShadow: isMe ? '0 2px 8px rgba(132, 162, 130, 0.25)' : '0 2px 6px rgba(132, 162, 130, 0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: isMe ? 'flex-end' : 'flex-start',
+                      maxWidth: '75%',
                     }}
                   >
-                    {msg.content}
+                    <div style={messageMetaStyle}>
+                      <span style={{ fontWeight: 700, fontSize: '0.82rem', color: isMe ? '#84A282' : 'var(--text-main)' }}>
+                        {isMe ? 'You' : msg.username}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
+                        {formatTime(msg.created_at)}
+                      </span>
+                      <button
+                        onClick={() => handleCopyMessage(msg.id, msg.content)}
+                        style={copyBtnStyle}
+                        title={copiedId === msg.id ? 'Copied!' : 'Copy message text'}
+                      >
+                        {copiedId === msg.id ? (
+                          <Check size={11} color="#84A282" />
+                        ) : (
+                          <Copy size={11} color="var(--text-subtle)" />
+                        )}
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        ...messageBubbleStyle,
+                        backgroundColor: isMe ? '#84A282' : '#F6E2E9',
+                        color: isMe ? '#FEFAF3' : '#1f2d22',
+                        borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
+                        border: isMe ? 'none' : '1px solid rgba(184, 207, 179, 0.5)',
+                        boxShadow: isMe ? '0 2px 8px rgba(132, 162, 130, 0.25)' : '0 2px 6px rgba(132, 162, 130, 0.08)',
+                      }}
+                    >
+                      {renderMessageContent(msg.content, isMe)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -421,6 +623,20 @@ export default function ChatArea({
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Floating Scroll to Bottom Button */}
+      {isScrolledUp && (
+        <button
+          onClick={scrollToBottom}
+          style={floatingScrollBtnStyle}
+          title="Scroll to latest messages"
+        >
+          <ChevronDown size={15} color="#84A282" />
+          <span style={{ fontSize: '0.76rem', fontWeight: 700 }}>
+            {newMessagesBelow ? 'New messages ↓' : 'Jump to present'}
+          </span>
+        </button>
+      )}
 
       {/* Typing Indicators & Composer Container */}
       <div style={composerContainerStyle}>
@@ -440,7 +656,7 @@ export default function ChatArea({
 
         {/* Quick Emoji Bar Popover */}
         {showEmojiPicker && (
-          <div style={emojiPickerBarStyle}>
+          <div ref={emojiPickerRef} style={emojiPickerBarStyle}>
             {quickEmojis.map((emoji) => (
               <button
                 key={emoji}
@@ -454,40 +670,70 @@ export default function ChatArea({
           </div>
         )}
 
-        {/* Input Form */}
-        <form onSubmit={handleSendMessage} style={composerFormStyle}>
-          <button
-            type="button"
-            onClick={() => setShowEmojiPicker((prev) => !prev)}
-            style={emojiToggleBtnStyle}
-            title="Insert Emoji"
-          >
-            <Smile size={18} />
-          </button>
+        {/* Non-member vs Input Composer Form */}
+        {!isDM && activeRoom.is_member === false ? (
+          <div style={notMemberComposerStyle}>
+            <span style={{ fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: 600 }}>
+              You are viewing <b>#{activeRoom.name}</b>. Join this channel to start sending messages.
+            </span>
+            <button
+              type="button"
+              onClick={() => onJoinRoom(activeRoom.id)}
+              className="btn-primary"
+              style={{ padding: '7px 16px', fontSize: '0.82rem' }}
+            >
+              Join Channel
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSendMessage} style={composerFormStyle}>
+            <button
+              ref={emojiButtonRef}
+              type="button"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              style={emojiToggleBtnStyle}
+              title="Insert Emoji (Esc to close)"
+            >
+              <Smile size={18} />
+            </button>
 
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={isDM ? `Message @${dmUser?.username || 'user'}...` : `Message #${activeRoom.name}...`}
-            style={messageInputStyle}
-            autoFocus
-          />
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={inputText}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isDM
+                  ? `Message @${dmUser?.username || 'user'}...`
+                  : `Message #${activeRoom.name}...`
+              }
+              style={messageInputStyle}
+              autoFocus
+            />
 
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            style={{
-              ...sendBtnStyle,
-              opacity: inputText.trim() ? 1 : 0.45,
-              cursor: inputText.trim() ? 'pointer' : 'default',
-            }}
-          >
-            <Send size={16} />
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={!inputText.trim()}
+              style={{
+                ...sendBtnStyle,
+                opacity: inputText.trim() ? 1 : 0.45,
+                cursor: inputText.trim() ? 'pointer' : 'default',
+              }}
+              title="Send Message (Enter)"
+            >
+              <Send size={15} />
+            </button>
+          </form>
+        )}
+
+        {/* Keyboard Shortcut Hint */}
+        <div style={composerHintStyle}>
+          <span>
+            Press <kbd style={kbdStyle}>Enter</kbd> to send, <kbd style={kbdStyle}>Shift + Enter</kbd> for new line
+          </span>
+          <span style={{ opacity: 0.8 }}>SyncWave Real-Time Chat</span>
+        </div>
       </div>
     </main>
   );
@@ -500,6 +746,7 @@ const chatContainerStyle = {
   flexDirection: 'column',
   backgroundColor: '#FEFAF3',
   minWidth: 0,
+  position: 'relative',
 };
 
 const headerStyle = {
@@ -548,7 +795,7 @@ const messagesFeedStyle = {
   padding: '20px',
   display: 'flex',
   flexDirection: 'column',
-  gap: '16px',
+  gap: '14px',
   backgroundColor: '#FEFAF3',
 };
 
@@ -578,12 +825,14 @@ const messageMetaStyle = {
 const messageBubbleStyle = {
   padding: '10px 16px',
   fontSize: '0.92rem',
-  lineHeight: 1.45,
+  lineHeight: 1.5,
   wordBreak: 'break-word',
+  overflowWrap: 'anywhere',
+  whiteSpace: 'pre-wrap', // Preserves multiline Shift+Enter formatting
 };
 
 const composerContainerStyle = {
-  padding: '0 20px 16px 20px',
+  padding: '0 20px 14px 20px',
   backgroundColor: 'transparent',
   position: 'relative',
 };
@@ -604,7 +853,7 @@ const typingTextActiveStyle = {
 
 const composerFormStyle = {
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-end',
   gap: '8px',
   backgroundColor: '#ffffff',
   border: '1px solid rgba(184, 207, 179, 0.65)',
@@ -621,21 +870,29 @@ const messageInputStyle = {
   padding: '8px 4px',
   fontSize: '0.92rem',
   color: 'var(--text-main)',
+  resize: 'none',
+  overflowY: 'auto',
+  lineHeight: 1.45,
+  minHeight: '38px',
+  maxHeight: '140px',
+  outline: 'none',
+  fontFamily: 'inherit',
 };
 
 const emojiToggleBtnStyle = {
   background: 'transparent',
   color: '#84A282',
-  padding: '6px',
+  padding: '8px 6px',
   borderRadius: '8px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  marginBottom: '2px',
 };
 
 const emojiPickerBarStyle = {
   position: 'absolute',
-  bottom: '68px',
+  bottom: '72px',
   left: '20px',
   borderRadius: '12px',
   padding: '6px 10px',
@@ -644,6 +901,7 @@ const emojiPickerBarStyle = {
   backgroundColor: '#FEFAF3',
   border: '1px solid rgba(184, 207, 179, 0.6)',
   boxShadow: '0 8px 24px rgba(132, 162, 130, 0.15)',
+  zIndex: 20,
 };
 
 const emojiButtonStyle = {
@@ -664,6 +922,98 @@ const sendBtnStyle = {
   alignItems: 'center',
   justifyContent: 'center',
   boxShadow: '0 2px 8px rgba(132, 162, 130, 0.3)',
+  flexShrink: 0,
+  marginBottom: '2px',
+};
+
+const composerHintStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '4px 8px 0 8px',
+  fontSize: '0.7rem',
+  color: 'var(--text-subtle)',
+};
+
+const kbdStyle = {
+  backgroundColor: 'rgba(184, 207, 179, 0.35)',
+  border: '1px solid rgba(132, 162, 130, 0.3)',
+  borderRadius: '4px',
+  padding: '1px 4px',
+  fontSize: '0.65rem',
+  fontFamily: 'monospace',
+  fontWeight: 600,
+  color: 'var(--text-main)',
+};
+
+const notMemberComposerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+  backgroundColor: 'rgba(246, 226, 233, 0.7)',
+  border: '1px solid rgba(184, 207, 179, 0.6)',
+  borderRadius: '14px',
+  padding: '12px 18px',
+  boxShadow: '0 2px 10px rgba(132, 162, 130, 0.08)',
+};
+
+const dateDividerWrapperStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  margin: '14px 0 6px 0',
+  position: 'relative',
+};
+
+const dateDividerLineStyle = {
+  flex: 1,
+  height: '1px',
+  backgroundColor: 'rgba(184, 207, 179, 0.4)',
+};
+
+const dateDividerBadgeStyle = {
+  padding: '3px 12px',
+  borderRadius: '12px',
+  backgroundColor: '#F6E2E9',
+  color: 'var(--text-muted)',
+  fontSize: '0.72rem',
+  fontWeight: 700,
+  margin: '0 12px',
+  letterSpacing: '0.02em',
+  boxShadow: '0 1px 4px rgba(132, 162, 130, 0.08)',
+};
+
+const floatingScrollBtnStyle = {
+  position: 'absolute',
+  bottom: '84px',
+  right: '28px',
+  backgroundColor: '#FEFAF3',
+  color: '#2e4530',
+  border: '1px solid rgba(132, 162, 130, 0.45)',
+  boxShadow: '0 4px 16px rgba(132, 162, 130, 0.25)',
+  borderRadius: '24px',
+  padding: '6px 14px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  cursor: 'pointer',
+  zIndex: 15,
+  transition: 'all 0.2s ease',
+  animation: 'fadeIn 0.2s ease-in',
+};
+
+const copyBtnStyle = {
+  background: 'transparent',
+  border: 'none',
+  padding: '2px 4px',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '4px',
+  opacity: 0.6,
+  transition: 'opacity 0.15s, background-color 0.15s',
 };
 
 const emptyRoomContainerStyle = {
