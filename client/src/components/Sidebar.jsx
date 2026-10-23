@@ -27,6 +27,8 @@ export default function Sidebar({
   onOpenDMModal,
   onOpenAdminModal,
   unreadCounts,
+  width = 280,
+  isCollapsed = false,
 }) {
   const { user, logout } = useAuth();
   const { connected, onlineUserIds } = useSocket();
@@ -43,8 +45,10 @@ export default function Sidebar({
     (room.dm_user?.username || room.name).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (isCollapsed) return null;
+
   return (
-    <aside style={sidebarStyle}>
+    <aside style={{ ...sidebarStyle, width: `${width}px`, minWidth: `${width}px` }}>
       {/* Brand Header */}
       <div style={brandHeaderStyle}>
         <div style={logoContainerStyle}>

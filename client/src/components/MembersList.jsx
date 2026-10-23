@@ -5,7 +5,7 @@ import { Users, X, MessageSquare } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 
-export default function MembersList({ members, isOpen, onClose, onStartDM }) {
+export default function MembersList({ members, isOpen, onClose, onStartDM, width = 240 }) {
   const { user } = useAuth();
   const { onlineUserIds } = useSocket();
 
@@ -76,7 +76,7 @@ export default function MembersList({ members, isOpen, onClose, onStartDM }) {
   };
 
   return (
-    <aside style={containerStyle}>
+    <aside style={{ ...containerStyle, width: `${width}px`, minWidth: `${width}px` }}>
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Users size={16} color="#84A282" />

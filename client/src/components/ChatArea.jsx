@@ -17,6 +17,8 @@ import {
   ChevronDown,
   Copy,
   Check,
+  SlidersHorizontal,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -28,6 +30,9 @@ export default function ChatArea({
   isMembersOpen,
   onJoinRoom,
   onOpenInviteModal,
+  onOpenWindowSizeModal,
+  isSidebarCollapsed,
+  onToggleSidebar,
 }) {
   const { user } = useAuth();
   const { socket, joinRoom, leaveRoom, startTyping, stopTyping, typingState, onlineUserIds } = useSocket();
@@ -389,6 +394,20 @@ export default function ChatArea({
       {/* Room Header */}
       <header style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          {isSidebarCollapsed && (
+            <button
+              onClick={onToggleSidebar}
+              style={{
+                ...memberToggleBtnStyle,
+                backgroundColor: 'rgba(184, 207, 179, 0.4)',
+                color: 'var(--text-main)',
+                padding: '6px 8px',
+              }}
+              title="Show Sidebar"
+            >
+              <PanelLeftOpen size={16} color="#84A282" />
+            </button>
+          )}
           <div style={roomIconBadgeStyle}>
             {isDM ? (
               <div style={{ position: 'relative' }}>
@@ -481,6 +500,19 @@ export default function ChatArea({
               </span>
             </button>
           )}
+
+          <button
+            onClick={onOpenWindowSizeModal}
+            style={{
+              ...memberToggleBtnStyle,
+              backgroundColor: 'rgba(184, 207, 179, 0.35)',
+              color: 'var(--text-main)',
+            }}
+            title="Adjust Window Size & Layout"
+          >
+            <SlidersHorizontal size={15} color="#84A282" />
+            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Window Size</span>
+          </button>
         </div>
       </header>
 

@@ -198,3 +198,9 @@ input:focus, textarea:focus, select:focus {
 input::placeholder, textarea::placeholder {
   color: var(--text-subtle);
 }
+
+/* Panel Drag Resizer */
+.resizer-handle:hover {
+  background-color: rgba(132, 162, 130, 0.5) !important;
+}
+
